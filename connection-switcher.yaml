@@ -1,0 +1,201 @@
+esphome:
+  name: connection-switcher
+  on_boot:
+    priority: -100
+    then:
+      # Ensure everything is synchronized on start.
+      - zigbee.setAttr:
+          id: selected_connection_attr
+          value: !lambda "return id(selected_connection);"
+      - script.execute: 
+          id: "set_selected_connection_script"
+          connection_number: !lambda "return id(selected_connection);"
+          force: true
+
+external_components:
+  # - source: github://luar123/zigbee_esphome
+
+  # There is a bug with the Zigbee component that prevents compiling. Using this proposed fix until it is merged.
+  # https://github.com/luar123/zigbee_esphome/issues/39
+  - source:
+      type: git
+      url: https://github.com/PaulBone/zigbee_esphome
+      ref: fix-template
+    components: [zigbee]
+
+esp32:
+  board: esp32-c6-devkitc-1
+  partitions: partitions_zb.csv
+  framework:
+    type: esp-idf
+
+# Enable logging
+logger:
+  hardware_uart: USB_SERIAL_JTAG
+
+globals:
+  - id: selected_connection
+    type: int
+    restore_value: no
+    initial_value: '0'
+
+# Define the onboard LED as an output.
+output:
+  - platform: ledc
+    pin: GPIO7
+    id: led_output
+
+# Define the onboard LED as a light.
+light:
+  - platform: monochromatic
+    output: led_output
+    id: onboard_led_light
+
+script:
+  - id: button_held_script
+    mode: restart
+    then:
+      - if:
+          condition:
+            binary_sensor.is_on: button_gpio9
+          then:
+            - delay: 5s
+            - if:
+                condition:
+                  binary_sensor.is_on: button_gpio9  # Check if the button is still held.
+                then:
+                  - logger.log: "Resetting Zigbee network"
+                  - zigbee.reset: zb
+
+  - id: set_selected_connection_script
+    mode: restart
+    parameters:
+      connection_number: int
+      force: bool
+    then:
+      - if:
+          condition:
+            lambda: "return id(selected_connection) != connection_number || force;"
+          then:
+            # Set the selected connection to the global variable.
+            - lambda: "id(selected_connection) = connection_number;"
+
+            # Transmit the IR commands to change the switch states to the selected connection.
+            - if:
+                condition:
+                  lambda: "return id(selected_connection) == 1;"
+                then:
+                  - remote_transmitter.transmit_nec:
+                      address: 0x7F80
+                      command: 0xFA05
+                  - remote_transmitter.transmit_nec:
+                      address: 0x7F80
+                      command: 0xFB04
+                else:
+                  - if:
+                      condition:
+                        lambda: "return id(selected_connection) == 2;"
+                      then:
+                        - remote_transmitter.transmit_nec:
+                            address: 0x7F80
+                            command: 0xF609
+                        - remote_transmitter.transmit_nec:
+                            address: 0x7F80
+                            command: 0xF906
+                      else:
+                        - if:
+                            condition:
+                              lambda: "return id(selected_connection) == 3;"
+                            then:
+                              - remote_transmitter.transmit_nec:
+                                  address: 0x7F80
+                                  command: 0xF807
+                              - remote_transmitter.transmit_nec:
+                                  address: 0x7F80
+                                  command: 0xF50A
+                            else:
+                              - remote_transmitter.transmit_nec:
+                                  address: 0x7F80
+                                  command: 0xE41B
+                              - remote_transmitter.transmit_nec:
+                                  address: 0x7F80
+                                  command: 0xE01F
+
+            # Indicate the selected connection with the onboard LED.
+            - if:
+                condition:
+                  lambda: "return id(selected_connection) == 0;"
+                then:
+                  - light.turn_on:
+                      id: onboard_led_light
+                      transition_length: 0s
+                  - light.turn_off:
+                      id: onboard_led_light
+                      transition_length: 1s
+                else:
+                  - repeat:
+                      count: !lambda "return id(selected_connection) * 2;"
+                      then:
+                        - light.toggle: 
+                            id: onboard_led_light
+                            transition_length: 0.125s
+                        - delay: 0.25s
+
+# Define a button on GPIO9.
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO9
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Button GPIO9"
+    id: button_gpio9
+    on_press:
+      - script.execute: button_held_script
+    on_release:
+      - script.stop: button_held_script
+    on_click: 
+      then:
+        - zigbee.setAttr:
+            id: selected_connection_attr
+            value: !lambda "return (id(selected_connection) + 1) % 4;"
+        - script.execute: 
+            id: "set_selected_connection_script"
+            connection_number: !lambda "return (id(selected_connection) + 1) % 4;"
+            force: false
+
+# Define a remote transmitter on GPIO3.
+remote_transmitter:
+  pin: GPIO3
+  carrier_duty_percent: 50%
+
+# Define Zigbee configuration.
+zigbee:
+  id: "zb"
+  endpoints:
+    - num: 1
+      device_type: CUSTOM_ATTR
+      clusters:
+        - id: ANALOG_OUTPUT
+          attributes:
+            - id: selected_connection_attr
+              attribute_id: 0x0055 # PresentValue
+              type: SINGLE
+              report: true
+              value: 0
+              on_value:
+                then:
+                  - script.execute: 
+                      id: "set_selected_connection_script"
+                      connection_number: !lambda "return (int)x;"
+                      force: false
+  on_join:
+    then:
+      - logger.log: "Joined Zigbee network"
+      - repeat:
+          count: 10
+          then:
+            - light.toggle: 
+                id: onboard_led_light
+                transition_length: 0s
+            - delay: 0.125s
