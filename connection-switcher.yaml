@@ -13,14 +13,7 @@ esphome:
           force: true
 
 external_components:
-  # - source: github://luar123/zigbee_esphome
-
-  # There is a bug with the Zigbee component that prevents compiling. Using this proposed fix until it is merged.
-  # https://github.com/luar123/zigbee_esphome/issues/39
-  - source:
-      type: git
-      url: https://github.com/PaulBone/zigbee_esphome
-      ref: fix-template
+  - source: github://luar123/zigbee_esphome
     components: [zigbee]
 
 esp32:
