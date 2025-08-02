@@ -26,3 +26,21 @@ With everything described so far, I'm able to use either PCs on my living room T
 This allows me to add everything to Home Assistant as a single logical Zigbee KVM switch where I can write automations against it. For example, I can press a single button on my phone and Home Assistant will command this device to set both switches to the correct position as well as anything that's needed for couch gaming like turning on the PC, turning on the TV, and setting the TV to the right input.
 
 ![M5Stack NanoC6 ESP32C6](images/M5StackNanoC6.png)
+
+## Current IR Codes
+#### HDMI Switch
+Address: `0x7F80`
+- 1: `nec` - `0xFA05`
+- 2: `nec` - `0xF609`
+- 3: `nec` - `0xF807`
+- 4: `nec` - `0xE41B`
+- 5: `nec` - `0xF708`
+
+#### USB Switch
+Address: `0x7F80`
+- ON: `nec` - `0xED12`
+- OFF: `nec` - `0xE11E`
+- 1: `nec` - `0xFB04`
+- 2: `nec` - `0xF906`
+- 3: `nec` - `0xF50A`
+- 4: `nec` - `0xE01F`
