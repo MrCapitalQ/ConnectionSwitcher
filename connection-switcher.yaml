@@ -78,41 +78,50 @@ script:
                 condition:
                   lambda: "return id(selected_connection) == 1;"
                 then:
-                  - remote_transmitter.transmit_nec:
-                      address: 0x7F80
-                      command: 0xFA05
-                  - remote_transmitter.transmit_nec:
-                      address: 0x7F80
-                      command: 0xFB04
+                  - script.execute: 
+                      id: "send_ir_command"
+                      command: 0xFA05 # HDMI Switch 1
+                  - script.execute: 
+                      id: "send_ir_command"
+                      command: 0xED12 # USB Switch On
+                  - script.execute: 
+                      id: "send_ir_command"
+                      command: 0xFB04 # USB Switch 1
                 else:
                   - if:
                       condition:
                         lambda: "return id(selected_connection) == 2;"
                       then:
-                        - remote_transmitter.transmit_nec:
-                            address: 0x7F80
-                            command: 0xF609
-                        - remote_transmitter.transmit_nec:
-                            address: 0x7F80
-                            command: 0xF906
+                        - script.execute: 
+                            id: "send_ir_command"
+                            command: 0xF609 # HDMI Switch 2
+                        - script.execute: 
+                            id: "send_ir_command"
+                            command: 0xED12 # USB Switch On
+                        - script.execute: 
+                            id: "send_ir_command"
+                            command: 0xF906 # USB Switch 2
                       else:
                         - if:
                             condition:
                               lambda: "return id(selected_connection) == 3;"
                             then:
-                              - remote_transmitter.transmit_nec:
-                                  address: 0x7F80
-                                  command: 0xF807
-                              - remote_transmitter.transmit_nec:
-                                  address: 0x7F80
-                                  command: 0xF50A
+                              - script.execute: 
+                                  id: "send_ir_command"
+                                  command: 0xF807 # HDMI Switch 3
+                              - script.execute: 
+                                  id: "send_ir_command"
+                                  command: 0xED12 # USB Switch On
+                              - script.execute: 
+                                  id: "send_ir_command"
+                                  command: 0xF50A # USB Switch 3
                             else:
-                              - remote_transmitter.transmit_nec:
-                                  address: 0x7F80
-                                  command: 0xE41B
-                              - remote_transmitter.transmit_nec:
-                                  address: 0x7F80
-                                  command: 0xE01F
+                              - script.execute: 
+                                  id: "send_ir_command"
+                                  command: 0xF708 # HDMI Switch 5 (not used)                              
+                              - script.execute: 
+                                  id: "send_ir_command"
+                                  command: 0xE11E # USB Switch Off
 
             # Indicate the selected connection with the onboard LED.
             - if:
@@ -132,7 +141,19 @@ script:
                         - light.toggle: 
                             id: onboard_led_light
                             transition_length: 0.125s
-                        - delay: 0.25s
+
+  - id: send_ir_command 
+    mode: queued 
+    parameters:
+      command: int
+    then:
+      - remote_transmitter.transmit_nec:
+          address: 0x7F80
+          command: !lambda "return command;"
+          repeat:
+            times: 3
+            wait_time: 15ms
+      - delay: 0.1s
 
 # Define a button on GPIO9.
 binary_sensor:
